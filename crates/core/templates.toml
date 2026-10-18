@@ -1,0 +1,94 @@
+# Rationale templates
+# ------------------------------------------------------------------
+# The engine walks an internal decision tree and picks fragments by id.
+# Wording lives here so legal can review and approve it without
+# touching code. Bump `ruleset` whenever wording or thresholds change:
+# every memo records the ruleset it was produced under.
+#
+# Syntax: Jinja ({{ var }}, {% if %}). Numbers arrive pre-formatted.
+
+ruleset = "2026.10-r1"
+
+[fragments.summary_aaa]
+text = "The legal copy meets WCAG 2.2 Level AAA for contrast. It is suitable for use."
+
+[fragments.summary_aa]
+text = "The legal copy meets WCAG 2.2 Level AA for contrast, the standard most accessibility policies and regulators reference. It is suitable for use."
+
+[fragments.summary_fail]
+text = "The legal copy does not meet WCAG 2.2 Level AA for contrast. It should be amended before use."
+
+[fragments.summary_no_copy]
+text = "No legal copy could be identified on this artwork. Mark the legal copy manually to complete the assessment."
+
+[fragments.context]
+text = "The artwork ({{ width }}×{{ height }}px) was assessed as {{ format }} ({{ medium }}{% if market %}, {{ market }} market{% endif %}). {{ reason }}"
+
+[fragments.wcag_applies]
+text = "WCAG 2.2 applies directly to {{ medium }} placements."
+
+[fragments.wcag_benchmark]
+text = "WCAG is written for digital content and does not formally apply to {{ medium }}. It is used here as an objective benchmark, with text size adjusted for a typical viewing distance of {{ viewing }}."
+
+[fragments.size_screen]
+text = "The legal copy is set at approximately {{ pt }}pt ({{ css_px }} CSS px) as displayed{% if lines > 1 %}, across {{ lines }} lines{% endif %}."
+
+[fragments.size_physical]
+text = "The legal copy is approximately {{ mm }}mm tall at final size, which reads like {{ pt }}pt text at 40cm when viewed from {{ viewing }}{% if lines > 1 %}; it runs across {{ lines }} lines{% endif %}."
+
+[fragments.size_normal]
+text = "This is below the WCAG large-text threshold (18pt, or 14pt bold), so the normal-text requirements apply: 4.5:1 for AA and 7:1 for AAA."
+
+[fragments.size_large]
+text = "This meets the WCAG large-text threshold ({{ basis }}), so the large-text requirements apply: 3:1 for AA and 4.5:1 for AAA."
+
+[fragments.weight_unknown]
+text = "Type weight could not be measured reliably at this size, so the text was treated as regular weight."
+
+[fragments.bg_uniform]
+text = "The text sits on a consistent background."
+
+[fragments.bg_varied]
+text = "The text sits on a varied background (gradient or image). Contrast was measured across the whole text area and the lowest value is reported."
+
+[fragments.result_aaa]
+text = "The lowest measured contrast is {{ ratio }}:1 ({{ fg }} on {{ bg }}), which exceeds the {{ aaa }}:1 required for Level AAA (success criterion 1.4.6)."
+
+[fragments.result_aa]
+text = "The lowest measured contrast is {{ ratio }}:1 ({{ fg }} on {{ bg }}), which meets the {{ aa }}:1 required for Level AA (success criterion 1.4.3). Level AAA (1.4.6) would require {{ aaa }}:1."
+
+[fragments.result_fail]
+text = "The lowest measured contrast is {{ ratio }}:1 ({{ fg }} on {{ bg }}), below the {{ aa }}:1 required for Level AA (success criterion 1.4.3)."
+
+[fragments.fix_colour]
+text = "Changing the text colour to {{ fix }} would meet Level AA against this background."
+
+[fragments.fix_colour_impossible]
+text = "No text colour reaches Level AA on this background; the background behind the copy needs to change (for example a solid panel or scrim)."
+
+[fragments.fix_size]
+text = "Alternatively, setting the copy at {{ pt }}pt or larger (about {{ px }}px tall in this artwork) would bring it under the large-text requirement of 3:1, which it already meets."
+
+[fragments.near_threshold]
+text = "The result is within 10% of the threshold. Check the final output, as compression, screen settings and print processes can shift colour."
+
+[fragments.low_confidence]
+text = "Measurement confidence is reduced ({{ confidence }}%). A manual check of the marked area is recommended."
+
+[fragments.manual_area]
+text = "The legal copy area was marked manually by the reviewer."
+
+[fragments.tiny_text]
+text = "Separately from contrast, the copy is very small ({{ pt }}pt equivalent). Regulators assess whether qualifying information is clear and prominent; text this small may be challenged even with sufficient contrast."
+
+[fragments.images_of_text]
+text = "As this is a digital placement, note WCAG 1.4.5 (Images of Text): where the format allows, provide the legal copy as live text or in accompanying text as well as in the image."
+
+[fragments.specialist]
+text = "This is a {{ category }} advertisement. Sector rules on the prominence of qualifying information are stricter than general guidance; specialist sign-off is recommended."
+
+[fragments.alt_text]
+text = "Where this artwork is used on the web or in apps, its text alternative (WCAG 1.1.1, Level A) must include the legal copy in full."
+
+[fragments.footer]
+text = "Assessed {{ date }} · ruleset {{ ruleset }} · smallpint {{ version }} · file {{ hash }}"

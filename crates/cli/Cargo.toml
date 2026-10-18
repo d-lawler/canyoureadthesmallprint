@@ -1,0 +1,13 @@
+[package]
+name = "smallpint-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "smallpint"
+path = "src/main.rs"
+
+[dependencies]
+smallpint-core = { path = "../core" }
+serde_json = "1"

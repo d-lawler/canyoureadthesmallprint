@@ -1,0 +1,15 @@
+# Netlify: link the repo, leave build settings blank, this file does the rest.
+[build]
+  base = "web"
+  publish = "dist"
+  # Netlify's image ships rustup; add the WebAssembly target, then build.
+  # wasm-pack comes from npm (web/package.json), so nothing else to install.
+  command = "rustup toolchain install stable --profile minimal && rustup default stable && rustup target add wasm32-unknown-unknown && npm run build"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

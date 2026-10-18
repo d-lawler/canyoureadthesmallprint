@@ -1,0 +1,41 @@
+{
+  "story_navy.png": {
+    "format": "story",
+    "font_px": 30,
+    "level": "AAA"
+  },
+  "story_grey_fail.png": {
+    "format": "story",
+    "font_px": 28,
+    "level": "Fail"
+  },
+  "mpu_2x.png": {
+    "format": "mpu",
+    "font_px": 20,
+    "level": "AA"
+  },
+  "feed_photo.jpg": {
+    "format": "feed_portrait",
+    "font_px": 30
+  },
+  "48sheet_10pct.png": {
+    "format": "48_sheet",
+    "font_px": 110
+  },
+  "a4_press.jpg": {
+    "format": "a4",
+    "font_px": 29
+  },
+  "odd_size.png": {
+    "format": null,
+    "font_px": 22
+  },
+  "story_gradient.png": {
+    "format": "story",
+    "font_px": 30
+  },
+  "feed_on_photo.png": {
+    "format": "feed_square",
+    "font_px": 28
+  }
+}
