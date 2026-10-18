@@ -4,6 +4,9 @@ a small tool that checks whether the legal copy on an ad is legible enough, and 
 
 [canyoureadthesmallprint.netlify.app](https://canyoureadthesmallprint.netlify.app)
 
+![Smallprint checking the legal copy on a sample Story ad: below WCAG AA at 2.81:1, with a suggested fix colour and the rationale for legal](https://github.com/user-attachments/assets/a9311bb4-68ae-4ed1-9ff9-2dada0ff37bc)
+
+
 drop in an image, click the small print (or drag a box around it), and it tells you **AAA**, **AA** or **below AA**, with the reasoning. it all runs in your browser, so the image never leaves your machine.
 
 this was vibe coded with claude over an evening, so treat it as a handy sketch rather than an audit tool. if something looks off, issues and PRs are very welcome.
