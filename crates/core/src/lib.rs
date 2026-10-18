@@ -61,6 +61,8 @@ pub struct Block {
     pub legal: bool,
     /// Drawn by hand rather than detected.
     pub manual: bool,
+    /// Looks like small print (smallest text on the artwork).
+    pub suggested: bool,
     /// "bottom-left", "top", …
     pub position: String,
     pub font_pt: Option<f64>,
@@ -145,38 +147,87 @@ pub fn analyze(bytes: &[u8], opts: &Options) -> Result<Report, Error> {
     // 2. find every block of text, decide which are legal copy
     let mut text_lines = detect::find_text_lines(&img);
     let found = detect::blocks(&text_lines);
-    text_lines.retain(|l| !l.weak);
+    let suggested = detect::likely_legal(&found);
     let chosen: Option<Vec<Rect>> = opts
         .legal_rects
         .clone()
         .or_else(|| opts.legal_rect.map(|r| vec![r]));
-    let overlaps =
-        |a: Rect, b: Rect| a.intersection(b) as f64 > 0.5 * a.area().min(b.area()) as f64;
-    // (rect, polarity hint, legal, manual)
-    let mut cands: Vec<(Rect, Option<Polarity>, bool, bool)> = Vec::new();
+    // the same block: a click on a suggestion sends its rect back verbatim
+    let same = |a: Rect, b: Rect| {
+        let i = a.intersection(b) as f64;
+        i / (a.area() + b.area()) as f64 * 2.0 > 0.85
+    };
+    // a hand-drawn box snaps to the text lines mostly inside it
+    let inside = |r: Rect| -> Vec<&TextLine> {
+        text_lines
+            .iter()
+            .filter(|l| r.intersection(l.rect) as f64 >= 0.6 * l.rect.area() as f64)
+            .collect()
+    };
+    let snap = |r: Rect| -> Rect {
+        inside(r)
+            .iter()
+            .map(|l| l.rect)
+            .reduce(Rect::union)
+            .unwrap_or(r)
+    };
+    // light or dark text, from the lines found in the box (majority by glyph count)
+    let polarity_of = |r: Rect| -> Option<Polarity> {
+        let ls = inside(r);
+        if ls.is_empty() {
+            return None;
+        }
+        let dark: usize = ls
+            .iter()
+            .filter(|l| l.polarity == Polarity::DarkOnLight)
+            .map(|l| l.glyphs)
+            .sum();
+        let all: usize = ls.iter().map(|l| l.glyphs).sum();
+        Some(if dark * 2 >= all {
+            Polarity::DarkOnLight
+        } else {
+            Polarity::LightOnDark
+        })
+    };
+    // (rect, polarity hint, legal, manual, suggested)
+    let mut cands: Vec<(Rect, Option<Polarity>, bool, bool, bool)> = Vec::new();
     match &chosen {
+        // no choice made (CLI / tests): assess the likely legal copy
         None => {
-            let auto = detect::likely_legal(&found);
             for (i, b) in found.iter().enumerate() {
-                cands.push((b.rect, Some(b.polarity), auto.contains(&i), false));
+                let s = suggested.contains(&i);
+                cands.push((b.rect, Some(b.polarity), s, false, s));
             }
         }
         Some(rs) => {
-            for b in &found {
+            let rs: Vec<Rect> = rs
+                .iter()
+                .map(|&r| {
+                    if found.iter().any(|b| same(r, b.rect)) {
+                        r
+                    } else {
+                        snap(r)
+                    }
+                })
+                .collect();
+            for (i, b) in found.iter().enumerate() {
+                let legal = rs.iter().any(|&r| same(r, b.rect));
                 cands.push((
                     b.rect,
                     Some(b.polarity),
-                    rs.iter().any(|&r| overlaps(r, b.rect)),
+                    legal,
                     false,
+                    suggested.contains(&i),
                 ));
             }
-            for &r in rs {
-                if !found.iter().any(|b| overlaps(r, b.rect)) {
-                    cands.push((r, None, true, true));
+            for &r in &rs {
+                if !found.iter().any(|b| same(r, b.rect)) && !cands.iter().any(|c| same(c.0, r)) {
+                    cands.push((r, polarity_of(r), true, true, false));
                 }
             }
         }
     }
+    text_lines.retain(|l| !l.weak);
     cands.sort_by_key(|c| (c.0.y, c.0.x));
 
     fn ctx_inputs<'a>(
@@ -198,8 +249,13 @@ pub fn analyze(bytes: &[u8], opts: &Options) -> Result<Report, Error> {
     }
     let mut blocks = Vec::new();
     let mut weakest: Option<(usize, Measurement, f64)> = None;
-    for (rect, pol, legal, manual) in &cands {
-        let m = measure::measure(&img, *rect, *pol);
+    for (rect, pol, legal, manual, suggested) in &cands {
+        // only legal copy is measured; other text is just offered for selection
+        let m = if *legal {
+            measure::measure(&img, *rect, *pol)
+        } else {
+            None
+        };
         let v = m.as_ref().map(|m| {
             rules::evaluate(&ctx_inputs(&meta, &context.chosen, opts, m, *manual)).verdict
         });
@@ -213,6 +269,7 @@ pub fn analyze(bytes: &[u8], opts: &Options) -> Result<Report, Error> {
             rect: *rect,
             legal: *legal,
             manual: *manual,
+            suggested: *suggested,
             position: position(*rect, meta.width_px, meta.height_px),
             font_pt: v.as_ref().map(|v| v.font_pt),
             ratio: v.as_ref().map(|v| v.ratio),

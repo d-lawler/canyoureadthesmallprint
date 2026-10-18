@@ -14,7 +14,7 @@ const src = ref('')
 const report = ref<Report | null>(null)
 const busy = ref(false)
 const error = ref('')
-const drawing = ref(false)
+const hover = ref<number | null>(null)
 const over = ref(false)
 const input = ref<HTMLInputElement>()
 const formats = ref<FormatInfo[]>([])
@@ -41,9 +41,10 @@ async function load(file: File) {
   fileName.value = file.name
   src.value = URL.createObjectURL(file)
   bytes.value = await file.arrayBuffer()
-  delete opts.format_id; delete opts.medium_hint; delete opts.legal_rects
+  delete opts.format_id; delete opts.medium_hint
+  opts.legal_rects = [] // nothing is assessed until the user picks the copy
   report.value = null
-  drawing.value = false
+  hover.value = null
   await run()
 }
 
@@ -77,14 +78,17 @@ async function example() {
 function setFormat(id: string) { opts.format_id = id; delete opts.medium_hint; run() }
 function setHint(h: MediumHint) { opts.medium_hint = h; delete opts.format_id; run() }
 const legalRects = () => (report.value?.blocks ?? []).filter((b) => b.legal).map((b) => b.rect)
-// a drawn box is added to whatever is already counted as legal copy
-function setRect(r: Rect) { opts.legal_rects = [...legalRects(), r]; drawing.value = false; run() }
+function setRect(r: Rect) { opts.legal_rects = [...legalRects(), r]; run() }
 function toggle(i: number) {
   const blocks = report.value?.blocks ?? []
   opts.legal_rects = blocks.filter((b, j) => (j === i ? !b.legal : b.legal)).map((b) => b.rect)
+  hover.value = null
   run()
 }
-function autoRect() { delete opts.legal_rects; run() }
+function selectSuggested() {
+  opts.legal_rects = (report.value?.blocks ?? []).filter((b) => b.suggested).map((b) => b.rect)
+  run()
+}
 function setMarket(e: Event) { opts.market = (e.target as HTMLSelectElement).value as Market; run() }
 function setCategory(e: Event) {
   const v = (e.target as HTMLSelectElement).value
@@ -116,25 +120,30 @@ function reset() { report.value = null; bytes.value = null; src.value = ''; erro
 
     <main v-else class="grid">
       <div class="art">
-        <Artwork :src="src" :report="report" :drawing="drawing" @rect="setRect" @toggle="toggle" />
-        <p v-if="drawing" class="grey hint no-print">
-          Drag a box around the legal copy to add it. <button class="act" @click="drawing = false">Cancel</button>
-        </p>
+        <Artwork :src="src" :report="report" :hover="hover" @rect="setRect" @toggle="toggle" />
       </div>
 
       <div class="info" :aria-busy="busy">
-        <p v-if="busy && !report" class="grey">Checking…</p>
+        <p v-if="busy && !report" class="grey">Reading the artwork…</p>
         <p v-if="error" class="err" role="alert">{{ error }}</p>
         <template v-if="report">
+          <section v-if="!report.verdict" class="pick">
+            <p class="strong">Select the legal copy</p>
+            <p class="grey">Click the outlined text on the artwork, or drag a box around it. Select every block of small print you need checked.</p>
+            <p v-if="report.blocks.some((b) => b.suggested)" class="no-print">
+              <button class="act" @click="selectSuggested">Select the smallest text for me</button>
+            </p>
+          </section>
+
+          <template v-else>
+            <dl class="rows">
+              <Verdict :report="report" />
+            </dl>
+            <Blocks :report="report" :src="src" @remove="toggle" @hover="(i) => (hover = i)" />
+          </template>
+
           <dl class="rows">
-            <Verdict v-if="report.verdict" :report="report" />
-            <template v-else>
-              <dt>Result</dt>
-              <dd>No legal copy selected. Tick a block below or <button class="act" @click="drawing = true">mark an area</button>.</dd>
-            </template>
-
             <ContextChip :report="report" :formats="formats" @format="setFormat" @hint="setHint" />
-
             <dt>Market</dt>
             <dd>
               <select class="inline" :value="opts.market" @change="setMarket">
@@ -152,7 +161,6 @@ function reset() { report.value = null; bytes.value = null; src.value = ''; erro
             </dd>
           </dl>
 
-          <Blocks :report="report" :src="src" @toggle="toggle" @add="drawing = true" @auto="autoRect" />
           <Memo v-if="report.verdict" :report="report" :file-name="fileName" />
         </template>
       </div>
@@ -181,10 +189,11 @@ function reset() { report.value = null; bytes.value = null; src.value = ''; erro
 .err { color: var(--ink); }
 .err::before { content: '— '; }
 
-.grid { display: grid; grid-template-columns: repeat(12, 1fr); column-gap: var(--gap); align-items: start; }
-.art { grid-column: 1 / span 6; position: sticky; top: var(--gap); }
-.info { grid-column: 8 / span 5; display: grid; row-gap: calc(var(--gap) * 2); }
-.hint { margin-top: 8px; }
+.grid { display: grid; grid-template-columns: minmax(0, max-content) minmax(320px, 520px); column-gap: calc(var(--gap) * 3); align-items: start; }
+.art { position: sticky; top: var(--gap); max-width: 58vw; }
+.info { display: grid; row-gap: calc(var(--gap) * 2); min-width: 0; }
+.pick { display: grid; row-gap: 6px; max-width: 40ch; }
+.strong { font-weight: 500; }
 
 .rows { display: grid; grid-template-columns: 7.5em 1fr; column-gap: var(--gap); row-gap: 6px; }
 .rows :deep(dt) { color: var(--grey); }
@@ -193,7 +202,7 @@ function reset() { report.value = null; bytes.value = null; src.value = ''; erro
 @media (max-width: 800px) {
   .top { padding-bottom: calc(var(--gap) * 2); }
   .about { order: 3; flex-basis: 100%; }
-  .art, .info { grid-column: 1 / -1; }
-  .art { position: static; margin-bottom: calc(var(--gap) * 2); }
+  .grid { grid-template-columns: 1fr; }
+  .art { position: static; max-width: none; margin-bottom: calc(var(--gap) * 2); }
 }
 </style>

@@ -48,6 +48,7 @@ export interface Block {
   rect: Rect
   legal: boolean
   manual: boolean
+  suggested: boolean
   position: string
   font_pt: number | null
   ratio: number | null
