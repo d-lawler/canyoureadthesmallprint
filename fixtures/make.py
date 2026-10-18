@@ -113,15 +113,15 @@ text_block(im, (60, 160), "Weekend", 150, (255, 255, 255), 960, BOLD)
 text_block(im, (60, 930), LEGAL, 28, (255, 255, 255), 960)
 save("feed_on_photo.png", im, 72, format="feed_square", font_px=28)
 
-# 10. Two candidate blocks: tiny UI text on a phone screen + the real super
+# 10. Two candidate blocks: tiny UI text on a phone screen + the real disclaimer super
 im = photo(1080, 1920, seed=11)
 d = ImageDraw.Draw(im)
 d.rounded_rectangle([360, 900, 860, 1500], 24, fill=(240, 238, 230))
-text_block(im, (390, 960), "Check our family calendar for a 2-hour slot next week when we're both free and suggest date ideas.", 18, (70, 70, 70), 440)
-text_block(im, (390, 1120), "Based on your calendar there is one clear 2-hour window during school hours.", 18, (110, 110, 110), 440)
+text_block(im, (390, 960), "Find a free hour on Thursday and suggest three places nearby for lunch.", 18, (70, 70, 70), 440)
+text_block(im, (390, 1120), "You have one free hour on Thursday afternoon between meetings.", 18, (110, 110, 110), 440)
 d.rectangle([0, 1640, 1080, 1800], fill=(30, 30, 30))
-text_block(im, (300, 1660), "Sequences shortened.", 40, (255, 255, 255), 700)
-text_block(im, (230, 1715), "Check responses for accuracy.", 40, (255, 255, 255), 700)
+text_block(im, (300, 1660), "Results may vary.", 40, (255, 255, 255), 700)
+text_block(im, (230, 1715), "Screens simulated for illustration.", 40, (255, 255, 255), 700)
 save("story_two_blocks.png", im, 72, format="story", font_px=18)
 
 # 11. Italic white super with a soft drop shadow straight over a photo
@@ -129,13 +129,13 @@ ITAL = "/usr/share/fonts/opentype/inter/Inter-Italic.otf"
 im = photo(1080, 1920, seed=5)
 sh = Image.new("RGBA", im.size, (0, 0, 0, 0))
 sd = ImageDraw.Draw(sh)
-for (y, t) in [(1560, "Sequences shortened"), (1610, "Check responses for accuracy")]:
+for (y, t) in [(1560, "Results may vary"), (1610, "Screens simulated for illustration")]:
     f = font(ITAL, 44); w = sd.textlength(t, font=f)
     sd.text(((1080 - w) / 2 + 2, y + 3), t, font=f, fill=(0, 0, 0, 200))
 sh = sh.filter(ImageFilter.GaussianBlur(3))
 im = Image.alpha_composite(im.convert("RGBA"), sh).convert("RGB")
 d = ImageDraw.Draw(im)
-for (y, t) in [(1560, "Sequences shortened"), (1610, "Check responses for accuracy")]:
+for (y, t) in [(1560, "Results may vary"), (1610, "Screens simulated for illustration")]:
     f = font(ITAL, 44); w = d.textlength(t, font=f)
     d.text(((1080 - w) / 2, y), t, font=f, fill=(255, 255, 255))
 save("story_super_photo.png", im, 72, format="story", font_px=44)

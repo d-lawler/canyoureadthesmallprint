@@ -7,7 +7,7 @@
 #
 # Syntax: Jinja ({{ var }}, {% if %}). Numbers arrive pre-formatted.
 
-ruleset = "2026.10-r2"
+ruleset = "2026.10-r3"
 
 [fragments.summary_aaa]
 text = "The legal copy meets WCAG 2.2 Level AAA for contrast. It is suitable for use."
@@ -97,4 +97,4 @@ text = "This is a {{ category }} advertisement. Sector rules on the prominence o
 text = "Where this artwork is used on the web or in apps, its text alternative (WCAG 1.1.1, Level A) must include the legal copy in full."
 
 [fragments.footer]
-text = "Assessed {{ date }} · ruleset {{ ruleset }} · smallpint {{ version }} · file {{ hash }}"
+text = "Automated check of contrast and size against WCAG 2.2; not legal advice. Assessed {{ date }} · ruleset {{ ruleset }} · smallpint {{ version }} · file {{ hash }}"
