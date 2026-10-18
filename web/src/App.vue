@@ -6,6 +6,7 @@ import Artwork from './components/Artwork.vue'
 import ContextChip from './components/ContextChip.vue'
 import Verdict from './components/Verdict.vue'
 import Memo from './components/Memo.vue'
+import Blocks from './components/Blocks.vue'
 
 const bytes = ref<ArrayBuffer | null>(null)
 const fileName = ref('')
@@ -40,7 +41,7 @@ async function load(file: File) {
   fileName.value = file.name
   src.value = URL.createObjectURL(file)
   bytes.value = await file.arrayBuffer()
-  delete opts.format_id; delete opts.medium_hint; delete opts.legal_rect
+  delete opts.format_id; delete opts.medium_hint; delete opts.legal_rects
   report.value = null
   drawing.value = false
   await run()
@@ -75,8 +76,15 @@ async function example() {
 }
 function setFormat(id: string) { opts.format_id = id; delete opts.medium_hint; run() }
 function setHint(h: MediumHint) { opts.medium_hint = h; delete opts.format_id; run() }
-function setRect(r: Rect) { opts.legal_rect = r; drawing.value = false; run() }
-function autoRect() { delete opts.legal_rect; run() }
+const legalRects = () => (report.value?.blocks ?? []).filter((b) => b.legal).map((b) => b.rect)
+// a drawn box is added to whatever is already counted as legal copy
+function setRect(r: Rect) { opts.legal_rects = [...legalRects(), r]; drawing.value = false; run() }
+function toggle(i: number) {
+  const blocks = report.value?.blocks ?? []
+  opts.legal_rects = blocks.filter((b, j) => (j === i ? !b.legal : b.legal)).map((b) => b.rect)
+  run()
+}
+function autoRect() { delete opts.legal_rects; run() }
 function setMarket(e: Event) { opts.market = (e.target as HTMLSelectElement).value as Market; run() }
 function setCategory(e: Event) {
   const v = (e.target as HTMLSelectElement).value
@@ -108,9 +116,9 @@ function reset() { report.value = null; bytes.value = null; src.value = ''; erro
 
     <main v-else class="grid">
       <div class="art">
-        <Artwork :src="src" :report="report" :drawing="drawing" @rect="setRect" />
+        <Artwork :src="src" :report="report" :drawing="drawing" @rect="setRect" @toggle="toggle" />
         <p v-if="drawing" class="grey hint no-print">
-          Drag a box around the legal copy. <button class="act" @click="drawing = false">Cancel</button>
+          Drag a box around the legal copy to add it. <button class="act" @click="drawing = false">Cancel</button>
         </p>
       </div>
 
@@ -122,19 +130,10 @@ function reset() { report.value = null; bytes.value = null; src.value = ''; erro
             <Verdict v-if="report.verdict" :report="report" />
             <template v-else>
               <dt>Result</dt>
-              <dd>No legal copy found. <button class="act" @click="drawing = true">Mark it</button></dd>
+              <dd>No legal copy selected. Tick a block below or <button class="act" @click="drawing = true">mark an area</button>.</dd>
             </template>
 
             <ContextChip :report="report" :formats="formats" @format="setFormat" @hint="setHint" />
-
-            <dt>Legal copy</dt>
-            <dd>
-              <span class="grey">{{ report.legal ? (report.legal.auto_detected ? 'Found automatically' : 'Marked by you') : 'Not found' }}</span>
-              <span class="no-print">
-                &ensp;<button class="act" @click="drawing = true">Redraw</button>
-                <template v-if="opts.legal_rect">&ensp;<button class="act" @click="autoRect">Auto</button></template>
-              </span>
-            </dd>
 
             <dt>Market</dt>
             <dd>
@@ -153,6 +152,7 @@ function reset() { report.value = null; bytes.value = null; src.value = ''; erro
             </dd>
           </dl>
 
+          <Blocks :report="report" :src="src" @toggle="toggle" @add="drawing = true" @auto="autoRect" />
           <Memo v-if="report.verdict" :report="report" :file-name="fileName" />
         </template>
       </div>
@@ -163,12 +163,11 @@ function reset() { report.value = null; bytes.value = null; src.value = ''; erro
 <style scoped>
 .page { min-height: 100vh; padding: var(--gap); }
 .top {
-  display: grid; grid-template-columns: repeat(12, 1fr); column-gap: var(--gap);
-  align-items: baseline; padding-bottom: calc(var(--gap) * 3);
+  display: flex; align-items: baseline; column-gap: 12px; row-gap: 4px; flex-wrap: wrap;
+  padding-bottom: calc(var(--gap) * 3);
 }
-.name { grid-column: 1 / span 2; justify-self: start; background: none; border: 0; padding: 0; cursor: pointer; font-weight: 500; }
-.about { grid-column: 3 / span 6; }
-.upload { grid-column: 11 / span 2; justify-self: end; }
+.name { background: none; border: 0; padding: 0; cursor: pointer; font-weight: 500; }
+.upload { margin-left: auto; }
 
 .empty { max-width: 100%; }
 .drop {
@@ -192,10 +191,8 @@ function reset() { report.value = null; bytes.value = null; src.value = ''; erro
 .rows :deep(dd) { min-width: 0; }
 
 @media (max-width: 800px) {
-  .top { grid-template-columns: 1fr auto; row-gap: 4px; padding-bottom: calc(var(--gap) * 2); }
-  .name { grid-column: 1; }
-  .upload { grid-column: 2; grid-row: 1; }
-  .about { grid-column: 1 / -1; }
+  .top { padding-bottom: calc(var(--gap) * 2); }
+  .about { order: 3; flex-basis: 100%; }
   .art, .info { grid-column: 1 / -1; }
   .art { position: static; margin-bottom: calc(var(--gap) * 2); }
 }

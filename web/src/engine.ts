@@ -20,6 +20,7 @@ function call<T>(msg: object): Promise<T> {
 }
 
 export const analyze = (bytes: ArrayBuffer, options: Options) =>
-  call<Report>({ kind: 'analyze', bytes: bytes.slice(0), options })
+  // JSON round-trip: Vue's reactive proxies can't be structured-cloned to a worker
+  call<Report>({ kind: 'analyze', bytes: bytes.slice(0), options: JSON.parse(JSON.stringify(options)) })
 
 export const listFormats = () => call<FormatInfo[]>({ kind: 'formats' })

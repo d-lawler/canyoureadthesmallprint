@@ -332,73 +332,116 @@ fn dedupe(mut lines: Vec<TextLine>) -> Vec<TextLine> {
     keep
 }
 
-/// Legal copy is (almost always) the smallest consistent text on the artwork.
-/// Returns the block rect, its polarity, and the indices of lines in it.
-pub fn pick_legal(lines: &[TextLine]) -> Option<(Rect, Polarity, Vec<usize>)> {
-    let min = lines
-        .iter()
-        .filter(|l| !l.weak)
-        .map(|l| l.glyph_px)
-        .fold(f64::INFINITY, f64::min);
-    if !min.is_finite() {
-        return None;
-    }
-    let small: Vec<usize> = (0..lines.len())
-        .filter(|&i| !lines[i].weak && lines[i].glyph_px <= min * 1.35 + 1.0)
-        .collect();
+#[derive(Clone, Debug, Serialize)]
+pub struct TextBlock {
+    pub rect: Rect,
+    /// Mean glyph height of the block's lines, px.
+    pub glyph_px: f64,
+    pub glyphs: usize,
+    pub lines: usize,
+    pub polarity: Polarity,
+}
 
-    // group vertically adjacent small lines into blocks
-    let mut blocks: Vec<Vec<usize>> = Vec::new();
-    for &i in &small {
+fn vgap(a: Rect, b: Rect) -> i64 {
+    (a.y as i64 - (b.y + b.h) as i64).max(b.y as i64 - (a.y + a.h) as i64)
+}
+
+/// Groups lines into blocks: paragraphs of similar-sized, adjacent lines.
+/// Short fragments (wrapped last words) join the block they sit against.
+pub fn blocks(lines: &[TextLine]) -> Vec<TextBlock> {
+    let strong: Vec<usize> = (0..lines.len()).filter(|&i| !lines[i].weak).collect();
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    for &i in &strong {
         let l = &lines[i];
-        let near = blocks.iter_mut().find(|blk| {
+        let joins = |blk: &Vec<usize>| {
             blk.iter().any(|&j| {
                 let o = &lines[j];
-                let vgap = (l.rect.y as i64 - (o.rect.y + o.rect.h) as i64)
-                    .max(o.rect.y as i64 - (l.rect.y + l.rect.h) as i64);
+                let ratio = l.glyph_px.max(o.glyph_px) / l.glyph_px.min(o.glyph_px);
                 let hover = l.rect.x < o.rect.x + o.rect.w + (o.glyph_px * 6.0) as u32
                     && o.rect.x < l.rect.x + l.rect.w + (l.glyph_px * 6.0) as u32;
-                vgap < (l.glyph_px * 2.5) as i64 && hover
+                ratio < 1.4
+                    && hover
+                    && vgap(l.rect, o.rect) < (l.glyph_px.max(o.glyph_px) * 2.5) as i64
             })
-        });
-        match near {
-            Some(b) => b.push(i),
-            None => blocks.push(vec![i]),
+        };
+        // a line can bridge two existing groups: merge them all
+        let hits: Vec<usize> = (0..groups.len()).filter(|&g| joins(&groups[g])).collect();
+        let mut merged = vec![i];
+        for &g in hits.iter().rev() {
+            merged.extend(groups.remove(g));
+        }
+        groups.push(merged);
+    }
+    for g in &mut groups {
+        loop {
+            let r = g
+                .iter()
+                .map(|&i| lines[i].rect)
+                .reduce(Rect::union)
+                .unwrap();
+            let gp = g.iter().map(|&i| lines[i].glyph_px).sum::<f64>() / g.len() as f64;
+            let add: Vec<usize> = (0..lines.len())
+                .filter(|i| lines[*i].weak && !g.contains(i))
+                .filter(|&i| {
+                    let l = &lines[i];
+                    (l.glyph_px / gp - 1.0).abs() < 0.4
+                        && vgap(l.rect, r) < (gp * 2.5) as i64
+                        && l.rect.x + 2 >= r.x
+                        && l.rect.x <= r.x + r.w
+                })
+                .collect();
+            if add.is_empty() {
+                break;
+            }
+            g.extend(add);
         }
     }
-    let mut best = blocks
+    let mut out: Vec<TextBlock> = groups
         .into_iter()
-        .max_by_key(|b| b.iter().map(|&i| lines[i].glyphs).sum::<usize>())?;
-    // absorb short fragments (wrapped last words) that touch the block
-    loop {
-        let r = best.iter().map(|&i| lines[i].rect).reduce(Rect::union)?;
-        let g = best.iter().map(|&i| lines[i].glyph_px).sum::<f64>() / best.len() as f64;
-        let add: Vec<usize> = (0..lines.len())
-            .filter(|i| !best.contains(i) && lines[*i].weak)
-            .filter(|&i| {
-                let l = &lines[i];
-                let similar = (l.glyph_px / g - 1.0).abs() < 0.4;
-                let vgap = (l.rect.y as i64 - (r.y + r.h) as i64)
-                    .max(r.y as i64 - (l.rect.y + l.rect.h) as i64);
-                let inside_x = l.rect.x + 2 >= r.x && l.rect.x <= r.x + r.w;
-                similar && vgap < (g * 2.5) as i64 && inside_x
-            })
-            .collect();
-        if add.is_empty() {
-            break;
-        }
-        best.extend(add);
-    }
-    let rect = best.iter().map(|&i| lines[i].rect).reduce(Rect::union)?;
-    // majority polarity
-    let dark = best
+        .map(|g| {
+            let rect = g
+                .iter()
+                .map(|&i| lines[i].rect)
+                .reduce(Rect::union)
+                .unwrap();
+            let strong_n = g.iter().filter(|&&i| !lines[i].weak).count().max(1);
+            let glyph_px = g
+                .iter()
+                .filter(|&&i| !lines[i].weak)
+                .map(|&i| lines[i].glyph_px)
+                .sum::<f64>()
+                / strong_n as f64;
+            let dark = g
+                .iter()
+                .filter(|&&i| lines[i].polarity == Polarity::DarkOnLight)
+                .count();
+            TextBlock {
+                rect,
+                glyph_px,
+                glyphs: g.iter().map(|&i| lines[i].glyphs).sum(),
+                lines: strong_n,
+                polarity: if dark * 2 >= g.len() {
+                    Polarity::DarkOnLight
+                } else {
+                    Polarity::LightOnDark
+                },
+            }
+        })
+        .filter(|b| b.glyphs >= 8)
+        .collect();
+    out.sort_by_key(|b| (b.rect.y, b.rect.x));
+    out
+}
+
+/// Legal copy is usually the smallest text on the artwork. Returns the
+/// indices of blocks within 35% of the smallest size: all of them are
+/// assessed, since an ad can carry more than one block of small print.
+pub fn likely_legal(blocks: &[TextBlock]) -> Vec<usize> {
+    let min = blocks
         .iter()
-        .filter(|&&i| lines[i].polarity == Polarity::DarkOnLight)
-        .count();
-    let pol = if dark * 2 >= best.len() {
-        Polarity::DarkOnLight
-    } else {
-        Polarity::LightOnDark
-    };
-    Some((rect, pol, best))
+        .map(|b| b.glyph_px)
+        .fold(f64::INFINITY, f64::min);
+    (0..blocks.len())
+        .filter(|&i| blocks[i].glyph_px <= min * 1.35 + 1.0)
+        .collect()
 }

@@ -26,6 +26,7 @@ export interface Report {
   meta: { width_px: number; height_px: number; format: string; dpi: number | null; dpi_source: string | null }
   context: { chosen: Candidate; alternatives: Candidate[]; needs_question: boolean }
   legal: { rect: Rect; auto_detected: boolean } | null
+  blocks: Block[]
   text_lines: { rect: Rect; glyph_px: number; glyphs: number }[]
   measurement: {
     fg: Rgb; bg_typical: Rgb; bg_worst: Rgb
@@ -43,10 +44,20 @@ export interface Report {
   hash: string
 }
 
+export interface Block {
+  rect: Rect
+  legal: boolean
+  manual: boolean
+  position: string
+  font_pt: number | null
+  ratio: number | null
+  level: Level | null
+}
+
 export interface Options {
   format_id?: string
   medium_hint?: MediumHint
-  legal_rect?: Rect
+  legal_rects?: Rect[]
   market?: Market
   category?: Category
   assessed_at?: string

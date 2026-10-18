@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { Rect, Report } from '../types'
 
 const props = defineProps<{ src: string; report: Report | null; drawing: boolean }>()
-const emit = defineEmits<{ rect: [Rect] }>()
+const emit = defineEmits<{ rect: [Rect]; toggle: [number] }>()
 
 const svg = ref<SVGSVGElement>()
 const drag = ref<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
@@ -44,19 +44,7 @@ function up() {
   if (r.w > 4 && r.h > 4) emit('rect', r)
 }
 
-const legal = computed(() => props.report?.legal?.rect)
 const pad = computed(() => unit.value * 6)
-// crop-mark corners around the legal copy, like a proof markup
-const marks = computed(() => {
-  const r = legal.value
-  if (!r) return ''
-  const p = pad.value, l = unit.value * 14
-  const x0 = r.x - p, y0 = r.y - p, x1 = r.x + r.w + p, y1 = r.y + r.h + p
-  return [
-    `M${x0} ${y0 + l}V${y0}H${x0 + l}`, `M${x1 - l} ${y0}H${x1}V${y0 + l}`,
-    `M${x1} ${y1 - l}V${y1}H${x1 - l}`, `M${x0 + l} ${y1}H${x0}V${y1 - l}`,
-  ].join('')
-})
 const live = computed(() => {
   const d = drag.value
   return d && { x: Math.min(d.x0, d.x1), y: Math.min(d.y0, d.y1), w: Math.abs(d.x1 - d.x0), h: Math.abs(d.y1 - d.y0) }
@@ -78,20 +66,16 @@ const live = computed(() => {
       @pointercancel="drag = null"
     >
       <g v-if="!drawing">
-        <rect
-          v-for="(l, i) in report.text_lines" :key="i"
-          :x="l.rect.x" :y="l.rect.y" :width="l.rect.w" :height="l.rect.h"
-          class="line" :stroke-width="unit"
-        />
-        <template v-if="legal">
-          <rect :x="legal.x - pad" :y="legal.y - pad" :width="legal.w + pad * 2" :height="legal.h + pad * 2" class="legal-fill" />
-          <path :d="marks" class="legal" :stroke-width="unit" />
-        </template>
+        <g v-for="(b, i) in report.blocks" :key="i" class="block" :class="{ on: b.legal }" @click="emit('toggle', i)">
+          <rect :x="b.rect.x - pad" :y="b.rect.y - pad" :width="b.rect.w + pad * 2" :height="b.rect.h + pad * 2" class="hit" />
+          <rect :x="b.rect.x - pad" :y="b.rect.y - pad" :width="b.rect.w + pad * 2" :height="b.rect.h + pad * 2" class="box" />
+          <text :x="b.rect.x - pad" :y="b.rect.y - pad - unit * 3" :font-size="unit * 11" class="num">{{ i + 1 }}</text>
+        </g>
         <rect
           v-if="report.measurement?.bg_varied"
           :x="report.measurement.worst_at.x" :y="report.measurement.worst_at.y"
           :width="report.measurement.worst_at.w" :height="report.measurement.worst_at.h"
-          class="worst" :stroke-width="unit"
+          class="worst" :stroke-width="unit * 1.5"
         />
       </g>
       <rect v-if="live" :x="live.x" :y="live.y" :width="live.w" :height="live.h" class="live" :stroke-width="unit * 2" />
@@ -99,7 +83,7 @@ const live = computed(() => {
     </div>
     <figcaption v-if="report" class="legend no-print">
       <span><i class="k-legal" /> Legal copy</span>
-      <span v-if="report.text_lines.length > 1"><i class="k-line" /> Other text</span>
+      <span v-if="report.blocks.some((b) => !b.legal)"><i class="k-line" /> Other text, click to include</span>
       <span v-if="report.measurement?.bg_varied"><i class="k-worst" /> Lowest contrast</span>
     </figcaption>
   </figure>
@@ -113,9 +97,14 @@ svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: non
 .drawing svg { cursor: crosshair; }
 /* difference blend keeps 1px markup visible on any artwork */
 g, .live { mix-blend-mode: difference; }
-.line { fill: none; stroke: #fff; stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-dasharray: 2 3; opacity: 0.5; }
-.legal { fill: none; stroke: #fff; stroke-linecap: square; }
-.legal-fill { fill: none; stroke: #fff; stroke-width: 1px; vector-effect: non-scaling-stroke; }
+.block { cursor: pointer; }
+.drawing .block { pointer-events: none; }
+.hit { fill: transparent; }
+.box { fill: none; stroke: #fff; stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-dasharray: 2 3; opacity: 0.55; }
+.block.on .box { stroke-dasharray: none; opacity: 1; stroke-width: 1.5px; }
+.block:hover .box { opacity: 1; }
+.num { fill: #fff; font-family: var(--font); opacity: 0.55; }
+.block.on .num { opacity: 1; }
 .worst { fill: none; stroke: #fff; stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-dasharray: 1 2; }
 .live { fill: none; stroke: #fff; stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .legend { display: flex; gap: var(--gap); color: var(--grey); margin-top: 8px; }

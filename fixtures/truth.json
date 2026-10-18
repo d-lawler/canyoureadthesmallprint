@@ -37,5 +37,13 @@
   "feed_on_photo.png": {
     "format": "feed_square",
     "font_px": 28
+  },
+  "story_two_blocks.png": {
+    "format": "story",
+    "font_px": 18
+  },
+  "story_super_photo.png": {
+    "format": "story",
+    "font_px": 44
   }
 }

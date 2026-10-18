@@ -7,7 +7,7 @@
 #
 # Syntax: Jinja ({{ var }}, {% if %}). Numbers arrive pre-formatted.
 
-ruleset = "2026.10-r1"
+ruleset = "2026.10-r2"
 
 [fragments.summary_aaa]
 text = "The legal copy meets WCAG 2.2 Level AAA for contrast. It is suitable for use."
@@ -23,6 +23,12 @@ text = "No legal copy could be identified on this artwork. Mark the legal copy m
 
 [fragments.context]
 text = "The artwork ({{ width }}×{{ height }}px) was assessed as {{ format }} ({{ medium }}{% if market %}, {{ market }} market{% endif %}). {{ reason }}"
+
+[fragments.legal_location]
+text = "The legal copy assessed is the block of small text at the {{ position }} of the artwork."
+
+[fragments.legal_blocks]
+text = "{{ count }} blocks of legal copy were assessed. The result reflects the weakest, at the {{ position }} of the artwork.{% for b in others %} The block at the {{ b.position }} measures {{ b.ratio }}:1 at {{ b.pt }}pt ({{ b.level }}).{% endfor %}"
 
 [fragments.wcag_applies]
 text = "WCAG 2.2 applies directly to {{ medium }} placements."

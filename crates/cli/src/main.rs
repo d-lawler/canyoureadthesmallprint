@@ -1,5 +1,6 @@
 //! smallpint <artwork> [--json] [--format ID] [--hint phone|web|billboard|print]
 //!           [--rect x,y,w,h] [--market uk|us|eu|other] [--category financial|…]
+//!           [--opts '<Options JSON>']
 
 use smallpint_core::{analyze, Options};
 use std::process::ExitCode;
@@ -39,6 +40,16 @@ fn main() -> ExitCode {
                 "legal_rect".into(),
                 serde_json::json!({"x":n[0],"y":n[1],"w":n[2],"h":n[3]}),
             );
+        }
+    }
+    // full Options as JSON, e.g. --opts '{"legal_rects":[{"x":0,"y":0,"w":10,"h":10}]}'
+    if let Some(v) = flag("--opts") {
+        match serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&v) {
+            Ok(m) => o.extend(m),
+            Err(e) => {
+                eprintln!("--opts: {e}");
+                return ExitCode::from(2);
+            }
         }
     }
     o.insert("assessed_at".into(), today().into());
