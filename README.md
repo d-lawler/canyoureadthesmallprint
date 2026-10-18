@@ -10,7 +10,7 @@ this was vibe coded with claude over an evening, so treat it as a handy sketch r
 
 ## how it works, if you're curious
 
-it's mostly one bit of maths from the WCAG spec. every colour gets turned into a "relative luminance" (how bright it looks to your eye; green counts for a lot, blue barely at all). then the text and background are compared as a ratio:
+it's mostly one bit of maths from the WCAG spec. every colour gets turned into a "relative luminance" (how bright it looks to your eye, green counts for a lot, blue barely at all). then the text and background are compared as a ratio:
 
 ```
 (lighter + 0.05) / (darker + 0.05)
@@ -45,3 +45,7 @@ cd web && npm install && npm run dev   # local site
 ```
 
 there's also a command-line version for checking files in bulk: `cargo run --release -p smallpint-cli -- some-ad.png`
+
+## licence
+
+MIT, do what you like with it. see [LICENSE](LICENSE).
