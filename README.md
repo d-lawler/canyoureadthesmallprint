@@ -1,80 +1,47 @@
 # can you read the small print?
 
-a small tool that checks whether the legal copy on an ad is legible enough against the WCAG contrast rules, and writes a short note you can hand to legal.
+a small tool that checks whether the legal copy on an ad is legible enough, and writes a short note you can hand to legal.
 
 [canyoureadthesmallprint.netlify.app](https://canyoureadthesmallprint.netlify.app)
 
-drop in an image, click the small print (or drag a box around it), and it tells you **AAA**, **AA** or **below AA**, with the reasoning. it all runs in your browser; the image never leaves your machine.
+drop in an image, click the small print (or drag a box around it), and it tells you **AAA**, **AA** or **below AA**, with the reasoning. it all runs in your browser, so the image never leaves your machine.
 
-a caveat up front: this was vibe coded with claude over an evening. the maths is the standard WCAG maths and there are tests, but it's a sketch rather than an audit tool. if you spot something wrong, issues and PRs are very welcome.
+this was vibe coded with claude over an evening, so treat it as a handy sketch rather than an audit tool. if something looks off, issues and PRs are very welcome.
 
-## the maths
+## how it works, if you're curious
 
-all of this comes from the WCAG 2.x spec. nothing here is new.
-
-**1. colour to luminance.** each sRGB channel (0 to 1) is linearised, then weighted by how sensitive our eyes are to it (green most, blue least):
+it's mostly one bit of maths from the WCAG spec. every colour gets turned into a "relative luminance" (how bright it looks to your eye; green counts for a lot, blue barely at all). then the text and background are compared as a ratio:
 
 ```
-c ≤ 0.04045  →  c / 12.92
-otherwise    →  ((c + 0.055) / 1.055) ^ 2.4
-
-L = 0.2126 R + 0.7152 G + 0.0722 B
+(lighter + 0.05) / (darker + 0.05)
 ```
 
-**2. contrast ratio.** lighter over darker, with a small offset for ambient light. it runs from 1:1 (same colour) to 21:1 (black on white):
+that gives you anything from 1:1 (same colour) to 21:1 (black on white). small text needs 4.5:1 for AA and 7:1 for AAA. big text gets a bit more leeway.
 
-```
-ratio = (L_lighter + 0.05) / (L_darker + 0.05)
-```
+the maths is the easy bit. the fun problems are around it:
 
-**3. thresholds.**
+- **figuring out which pixels are text.** inside your box it splits the pixels into light and dark, and takes the text colour from the solid middle of the letters rather than the soft anti-aliased edges.
+- **text over photos.** it checks the background in little tiles and reports the worst one. white text that's fine over a dark sleeve but disappears over a bright window gets judged on the window.
+- **how big the text really is.** a 1080px instagram story ends up about 390px wide on a phone, so text that looks fine in figma can be tiny in real life. it works this out from the file: standard ad sizes, @2x exports, and DPI for print (it can tell a billboard supplied at 10% scale). for billboards it scales by viewing distance, so text on a 48-sheet seen from 15m is treated like much smaller text held in your hand.
+- **erring on the strict side.** when it has to guess (font size, weight, rounding) it guesses in the direction that makes passing harder.
 
-|              | AA    | AAA   |
-| ------------ | ----- | ----- |
-| normal text  | 4.5:1 | 7:1   |
-| large text (18pt+, or 14pt+ bold) | 3:1 | 4.5:1 |
-
-that's the easy part. the fiddly bits are around the maths:
-
-- **which pixels are text?** inside the box you select, pixels are split into two groups by brightness ([Otsu's method](https://en.wikipedia.org/wiki/Otsu%27s_method)). the text colour is the median of the most solid 30% of text pixels, so anti-aliased edges don't drag it towards the background.
-- **which background?** the box is cut into tiles and every tile behind text is measured. the worst one is reported, so white text over a photo is judged on its weakest spot, not an average.
-- **how big is the text?** the x-height is measured from the rows of text pixels and divided by 0.56, the high end for real fonts. that way the estimate errs small, which means stricter thresholds when in doubt. ratios are truncated, never rounded up across a threshold.
-- **how big will it look?** this comes from the file. standard ad sizes (including @2x exports), embedded DPI for print (including billboard artwork supplied at 10%), or aspect ratio. on screens, `pt = image px × (screen css width ÷ image width) × 0.75`. for billboards the text is scaled to the same visual angle at a 40cm reading distance (`size × 0.4m ÷ viewing distance`). it's a rough benchmark, since WCAG doesn't formally cover print.
+the note for legal is stitched together from fixed sentences in [`crates/core/templates.toml`](crates/core/templates.toml), with no AI in the app. the same image always gives the same note, and the wording can be checked once and versioned.
 
 ## what it doesn't do
 
-- it's not legal advice. it checks contrast and size; it doesn't judge whether the wording is enough, or apply ASA / CAP / FTC prominence rules (beyond flagging very small text).
-- it doesn't read the text (no OCR). it knows *where* the copy is, not *what* it says.
-- PDFs aren't supported yet. export a PNG or JPG at the intended DPI.
-- bold detection is rough, so text is treated as regular weight unless it's clearly bold.
-- the text finder is heuristic. photo texture can produce stray outlines, and very stylised lettering may need a hand-drawn box.
+- it's not legal advice. it checks contrast and size, not whether the wording is enough.
+- it doesn't read the text. it knows *where* the small print is, not *what* it says.
+- no PDFs yet. export a PNG or JPG.
+- the text finder sometimes outlines bits of photo too. just ignore those.
 
-## how it's built
+## running it
 
-the analysis is rust, compiled to WebAssembly and run in a web worker. the interface is a small vue app. there's no server; netlify just hosts the files.
-
-```
-crates/
-  core/    the engine: format detection, text finding, measurement, rules, memo
-  wasm/    the browser bindings
-  cli/     same engine on the command line, handy for testing
-web/       vue + vite interface
-fixtures/  generated test artwork with known answers
-```
-
-the memo is assembled from fixed sentences in [`crates/core/templates.toml`](crates/core/templates.toml), picked by the rules. there's no AI in the app itself. the same image always gives the same note, and the wording can be reviewed once and versioned (`ruleset` in that file). every note records the ruleset, version and a hash of the image.
-
-## run it
-
-needs rust (via rustup) and node 22.
+the engine is rust compiled to WebAssembly, the interface is a small vue app, and netlify hosts it. there's no server.
 
 ```sh
 rustup target add wasm32-unknown-unknown
-
-cargo test --workspace                   # unit + fixture tests
-cargo run --release -p smallpint-cli -- fixtures/story_grey_fail.png
-
-cd web && npm install && npm run dev     # builds the wasm, starts vite
+cargo test --workspace                 # tests
+cd web && npm install && npm run dev   # local site
 ```
 
-netlify picks up `netlify.toml`, so linking the repo is all the setup it needs.
+there's also a command-line version for checking files in bulk: `cargo run --release -p smallpint-cli -- some-ad.png`
